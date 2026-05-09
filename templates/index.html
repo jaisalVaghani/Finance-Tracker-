@@ -155,8 +155,8 @@
       .tf-bar { padding: 6px 10px 4px; gap: 5px; flex-wrap: wrap; }
       .tf-btn { padding: 5px 11px; font-size: 0.74rem; }
 
-      /* chart */
-      .chart-box { padding: 0 2px 4px; width: 100%; overflow: hidden; }
+      /* chart — fixed min-height prevents layout shift when news loads below */
+      .chart-box { padding: 0 2px 4px; width: 100%; overflow: hidden; min-height: 220px; flex-shrink: 0; }
 
       /* news */
       .news-box { padding: 12px 14px 14px; }
@@ -202,7 +202,7 @@
       .badge { font-size: 0.8rem; padding: 2px 7px; }
 
       /* charts: remove side padding so they stretch fully */
-      .chart-box { padding: 0 0 4px; }
+      .chart-box { padding: 0 0 4px; min-height: 220px; flex-shrink: 0; }
       .tf-btn { padding: 5px 9px; font-size: 0.7rem; }
     }
 
