@@ -156,7 +156,7 @@
       .tf-btn { padding: 5px 11px; font-size: 0.74rem; }
 
       /* chart */
-      .chart-box { padding: 0 2px 4px; }
+      .chart-box { padding: 0 2px 4px; width: 100%; overflow: hidden; }
 
       /* news */
       .news-box { padding: 12px 14px 14px; }
@@ -274,7 +274,7 @@
     .warn.hidden { display: none; }
 
     /* ── chart area ──────────────────────────────────────────────────── */
-    .chart-box { padding: 0 6px 4px; flex-shrink: 0; }
+    .chart-box { padding: 0 6px 4px; flex-shrink: 0; width: 100%; overflow: hidden; }
 
     .no-chart {
       height: 60px;
@@ -739,12 +739,13 @@ const INTL_SYMBOLS = { "NASDAQ": "^IXIC", "S&P 500": "^GSPC", "KOSPI": "^KS11", 
 const PLOTLY_CFG = { responsive: true, displayModeBar: false };
 
 function plotLayout(yRange) {
-  const isMobile = window.innerWidth <= 480;
+  const isMobile = window.innerWidth < 768;
+  const chartHeight = isMobile ? 200 : 350;
   return {
     paper_bgcolor: "transparent",
     plot_bgcolor:  "transparent",
     margin: isMobile ? { l: 42, r: 4, t: 4, b: 28 } : { l: 50, r: 8, t: 6, b: 32 },
-    height: isMobile ? 155 : 190,
+    height: chartHeight,
     xaxis: {
       showgrid: false, zeroline: false, showline: false,
       tickfont: { size: 10, color: "#8b949e" },
@@ -1079,7 +1080,7 @@ async function loadIndices() {
       if (!d) continue;
       const sid   = safeId(sym);
       const chart = d.chart || {};
-      drawChart(`chart-${sid}`, chart.times, chart.prices, d.pChange);
+      requestAnimationFrame(() => drawChart(`chart-${sid}`, chart.times, chart.prices, d.pChange));
       loadNews(`news-${sid}`, INDEX_NEWS[sym] || sym, d.pChange);
     }
   } catch (e) {
@@ -1105,7 +1106,7 @@ async function loadCommodities() {
       const d = data[key];
       if (!d) continue;
       const sid = key.toLowerCase();
-      drawChart(`chart-${sid}`, d.times, d.prices, d.pChange);
+      requestAnimationFrame(() => drawChart(`chart-${sid}`, d.times, d.prices, d.pChange));
       loadNews(`news-${sid}`, COMMODITY_NEWS[key] || key, d.pChange);
     }
   } catch (e) {
@@ -1132,7 +1133,7 @@ async function loadIntl() {
       if (!d) continue;
       const sid   = safeId(name);
       const chart = d.chart || {};
-      drawChart(`chart-intl-${sid}`, chart.times, chart.prices, d.pChange);
+      requestAnimationFrame(() => drawChart(`chart-intl-${sid}`, chart.times, chart.prices, d.pChange));
       loadNews(`news-intl-${sid}`, INTL_NEWS[name] || name, d.pChange);
     }
   } catch (e) {
