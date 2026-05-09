@@ -140,15 +140,19 @@
       /* all grids → single column */
       .grid-3, .grid-2, .grid-4 { grid-template-columns: 1fr; gap: 14px; }
 
+      /* hide "Updated:" on mobile to save space */
+      .meta-updated { display: none; }
+
       /* card internals */
       .card-top { padding: 14px 14px 10px; }
       .price { font-size: 1.55rem; }
-      .stats { gap: 12px; margin-top: 8px; }
+      /* OHLC stats: 2×2 grid instead of 4-in-a-row */
+      .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; margin-top: 8px; }
       .stat-l { font-size: 0.63rem; }
       .stat-v { font-size: 0.77rem; }
 
-      /* timeframe bar — bigger tap targets */
-      .tf-bar { padding: 6px 10px 4px; gap: 5px; }
+      /* timeframe bar — bigger tap targets, wraps if needed */
+      .tf-bar { padding: 6px 10px 4px; gap: 5px; flex-wrap: wrap; }
       .tf-btn { padding: 5px 11px; font-size: 0.74rem; }
 
       /* chart */
@@ -165,12 +169,41 @@
 
     /* ── very small screens (≤ 390px / iPhone 14) ───────────────────── */
     @media (max-width: 390px) {
-      header { padding: 8px 10px; }
+      /* header: stack logo row → controls row → full-width refresh */
+      header {
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: flex-start;
+        padding: 10px 12px;
+        gap: 6px;
+      }
+      .logo { font-size: 0.88rem; }
+      .header-right {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        gap: 6px 10px;
+        font-size: 0.74rem;
+      }
+      /* show IST clock in the stacked row (overrides the 768px display:none) */
+      #ist-clock { display: inline; }
+      /* refresh button spans full width, rendered last */
+      .btn-refresh {
+        flex: 0 0 100%;
+        width: 100%;
+        order: 99;
+        padding: 8px 16px;
+        font-size: 0.8rem;
+        margin-top: 2px;
+      }
+
       main   { padding: 10px 10px 40px; }
       .price { font-size: 1.35rem; }
       .badge { font-size: 0.8rem; padding: 2px 7px; }
+
+      /* charts: remove side padding so they stretch fully */
+      .chart-box { padding: 0 0 4px; }
       .tf-btn { padding: 5px 9px; font-size: 0.7rem; }
-      .header-right { gap: 6px; }
     }
 
     /* ── card ────────────────────────────────────────────────────────── */
@@ -586,7 +619,7 @@
     </div>
     <span id="sentiment-badge" class="sentiment-badge neutral">⚪ Neutral</span>
     <div class="meta-item"><span id="ist-clock">—</span></div>
-    <div class="meta-item">Updated: <span id="last-updated">—</span></div>
+    <div class="meta-item meta-updated">Updated: <span id="last-updated">—</span></div>
     <div class="meta-item"><span class="cd-label">Next refresh: </span><span id="countdown" style="font-variant-numeric:tabular-nums">5:00</span></div>
     <button class="btn-refresh" id="btn-refresh" onclick="doRefresh()">⟳ Refresh</button>
   </div>
@@ -706,11 +739,12 @@ const INTL_SYMBOLS = { "NASDAQ": "^IXIC", "S&P 500": "^GSPC", "KOSPI": "^KS11", 
 const PLOTLY_CFG = { responsive: true, displayModeBar: false };
 
 function plotLayout(yRange) {
+  const isMobile = window.innerWidth <= 480;
   return {
     paper_bgcolor: "transparent",
     plot_bgcolor:  "transparent",
-    margin: { l: 50, r: 8, t: 6, b: 32 },
-    height: 190,
+    margin: isMobile ? { l: 42, r: 4, t: 4, b: 28 } : { l: 50, r: 8, t: 6, b: 32 },
+    height: isMobile ? 155 : 190,
     xaxis: {
       showgrid: false, zeroline: false, showline: false,
       tickfont: { size: 10, color: "#8b949e" },
