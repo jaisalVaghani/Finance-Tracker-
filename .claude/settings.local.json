@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python app.py)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(Start-Sleep -Seconds 3; $resp = try { Invoke-WebRequest \"http://localhost:5000/api/buzz\" -TimeoutSec 10 -UseBasicParsing } catch { $null }; if \\($resp\\) { $resp.Content | ConvertFrom-Json | ConvertTo-Json -Depth 3 } else { \"Server not ready yet\" })",
+      "PowerShell(cd \"C:\\\\Users\\\\Mayank\\\\claude-test\\\\finance-dashboard\"; $env:FLASK_ENV = \"development\"; python app.py)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('newsletter.py'\\).read\\(\\)\\); print\\('✓ Syntax OK'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('newsletter.py', encoding='utf-8'\\).read\\(\\)\\); print\\('Syntax OK'\\)\")"
+    ]
+  }
+}

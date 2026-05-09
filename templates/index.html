@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Finance Tracker</title>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <style>
+    /* ── tokens ─────────────────────────────────────────────────────── */
+    :root {
+      --bg:        #0d1117;
+      --card:      #161b22;
+      --card2:     #1c2128;
+      --border:    #30363d;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --green:     #3fb950;
+      --green-bg:  rgba(63,185,80,.12);
+      --red:       #f85149;
+      --red-bg:    rgba(248,81,73,.12);
+      --gold:      #e3b341;
+      --silver:    #adbac7;
+      --accent:    #58a6ff;
+      --radius:    12px;
+    }
+
+    /* ── reset ───────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    a { color: inherit; text-decoration: none; }
+
+    /* ── header ──────────────────────────────────────────────────────── */
+    header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      gap: 12px;
+    }
+    .logo {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+    .logo span { color: var(--text); }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      flex-wrap: wrap;
+    }
+    .meta-item { display: flex; align-items: center; gap: 5px; }
+
+    /* market status dot */
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+    .dot.closed { background: var(--muted); animation: none; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+    .btn-refresh {
+      background: var(--accent);
+      color: #0d1117;
+      border: none;
+      padding: 6px 16px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity .15s;
+      white-space: nowrap;
+    }
+    .btn-refresh:hover { opacity: .82; }
+    .btn-refresh:active { opacity: .65; }
+
+    /* ── main layout ─────────────────────────────────────────────────── */
+    main { padding: 28px 28px 60px; max-width: 1680px; margin: 0 auto; }
+
+    .section { margin-bottom: 44px; }
+    .section-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 20px;
+    }
+
+    /* 3-col for indices, 2-col for commodities */
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+    }
+    @media (max-width: 1280px) { .grid-3 { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 820px)  { .grid-3, .grid-2 { grid-template-columns: 1fr; } }
+
+    /* ── mobile (≤ 768px) ────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      /* header */
+      header { padding: 10px 14px; gap: 8px; flex-wrap: wrap; }
+      .logo  { font-size: 1rem; }
+      .header-right { gap: 8px; font-size: 0.74rem; }
+      #ist-clock { display: none; }           /* hide clock on small screens */
+      .sentiment-badge { font-size: 0.7rem; padding: 2px 7px; }
+      .btn-refresh { padding: 5px 12px; font-size: 0.76rem; }
+      /* hide "Next refresh:" label text, keep countdown only */
+      .meta-item .cd-label { display: none; }
+
+      /* layout */
+      main { padding: 14px 12px 48px; }
+      .section { margin-bottom: 28px; }
+      .section-title { font-size: 0.72rem; margin-bottom: 14px; }
+
+      /* all grids → single column */
+      .grid-3, .grid-2, .grid-4 { grid-template-columns: 1fr; gap: 14px; }
+
+      /* card internals */
+      .card-top { padding: 14px 14px 10px; }
+      .price { font-size: 1.55rem; }
+      .stats { gap: 12px; margin-top: 8px; }
+      .stat-l { font-size: 0.63rem; }
+      .stat-v { font-size: 0.77rem; }
+
+      /* timeframe bar — bigger tap targets */
+      .tf-bar { padding: 6px 10px 4px; gap: 5px; }
+      .tf-btn { padding: 5px 11px; font-size: 0.74rem; }
+
+      /* chart */
+      .chart-box { padding: 0 2px 4px; }
+
+      /* news */
+      .news-box { padding: 12px 14px 14px; }
+      .news-item a { font-size: 0.79rem; }
+
+      /* card header row (intl) */
+      .card-header-row { gap: 6px; }
+      .mkt-badge { font-size: 0.62rem; padding: 2px 6px; }
+    }
+
+    /* ── very small screens (≤ 390px / iPhone 14) ───────────────────── */
+    @media (max-width: 390px) {
+      header { padding: 8px 10px; }
+      main   { padding: 10px 10px 40px; }
+      .price { font-size: 1.35rem; }
+      .badge { font-size: 0.8rem; padding: 2px 7px; }
+      .tf-btn { padding: 5px 9px; font-size: 0.7rem; }
+      .header-right { gap: 6px; }
+    }
+
+    /* ── card ────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card-top { padding: 18px 20px 14px; }
+
+    .card-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .price-row { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+
+    .price {
+      font-size: 1.95rem;
+      font-weight: 700;
+      letter-spacing: -.02em;
+      line-height: 1;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+    .badge.up   { color: var(--green); background: var(--green-bg); }
+    .badge.down { color: var(--red);   background: var(--red-bg);   }
+
+    .abs-change { font-size: 0.85rem; font-weight: 600; }
+
+    .stats {
+      display: flex;
+      gap: 20px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    .stat { display: flex; flex-direction: column; gap: 2px; }
+    .stat-l { font-size: 0.68rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+    .stat-v { font-size: 0.82rem; font-weight: 600; }
+
+    /* ── warning banner ──────────────────────────────────────────────── */
+    .warn {
+      margin: 0 20px 14px;
+      padding: 10px 14px;
+      background: rgba(248,81,73,.13);
+      border: 1px solid var(--red);
+      border-radius: 8px;
+      font-size: 0.83rem;
+      color: var(--red);
+      font-weight: 600;
+    }
+    .warn.hidden { display: none; }
+
+    /* ── chart area ──────────────────────────────────────────────────── */
+    .chart-box { padding: 0 6px 4px; flex-shrink: 0; }
+
+    .no-chart {
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    /* ── timeframe selector ─────────────────────────────────────────────── */
+    .tf-bar {
+      display: flex;
+      gap: 4px;
+      padding: 6px 16px 4px;
+    }
+    .tf-btn {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid transparent;
+      padding: 2px 9px;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: .04em;
+      transition: color .12s, border-color .12s, background .12s;
+    }
+    .tf-btn:hover  { color: var(--text); border-color: var(--border); }
+    .tf-btn.active {
+      color: var(--green);
+      border-color: var(--green);
+      background: var(--green-bg);
+    }
+
+    /* ── news ────────────────────────────────────────────────────────── */
+    .news-box {
+      border-top: 1px solid var(--border);
+      padding: 14px 20px 18px;
+      background: var(--card2);
+      flex-grow: 1;
+    }
+    .news-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+    .news-list { list-style: none; display: flex; flex-direction: column; gap: 9px; }
+    .news-item a {
+      font-size: 0.81rem;
+      line-height: 1.45;
+      color: var(--text);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      transition: color .12s;
+    }
+    .news-item a:hover { color: var(--accent); }
+    .news-pub { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+    .news-summary {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--accent);
+      background: rgba(88,166,255,.1);
+      border: 1px solid rgba(88,166,255,.25);
+      border-radius: 6px;
+      padding: 6px 10px;
+      margin-bottom: 10px;
+      line-height: 1.4;
+      display: none;
+    }
+    .news-meta { display: flex; align-items: center; gap: 7px; margin-top: 3px; flex-wrap: wrap; }
+    .news-src {
+      font-size: 0.67rem;
+      font-weight: 600;
+      letter-spacing: .03em;
+      color: var(--muted);
+      background: rgba(139,148,158,.12);
+      border-radius: 3px;
+      padding: 1px 5px;
+    }
+    .news-src.prio {
+      color: var(--gold);
+      background: rgba(227,179,65,.12);
+    }
+
+    /* ── loading / error ─────────────────────────────────────────────── */
+    .skeleton {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 48px;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .err-block {
+      grid-column: 1 / -1;
+      padding: 32px;
+      text-align: center;
+      color: var(--red);
+      font-size: 0.88rem;
+    }
+
+    /* ── commodity tag pill ──────────────────────────────────────────── */
+    .tag {
+      display: inline-block;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      padding: 2px 9px;
+      border-radius: 12px;
+      margin-bottom: 6px;
+    }
+    .tag-gold   { color: var(--gold);   background: rgba(227,179,65,.15); }
+    .tag-silver { color: var(--silver); background: rgba(173,186,199,.15); }
+
+    /* ── 4-col grid (international) ─────────────────────────────────── */
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+    }
+    @media (max-width: 1280px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 820px)  { .grid-4 { grid-template-columns: 1fr; } }
+
+    /* ── card up/down tint ───────────────────────────────────────────── */
+    .card { transition: border-color .3s, box-shadow .3s; }
+    .card.card-up   { border-color: rgba(63,185,80,.28);  box-shadow: 0 2px 14px rgba(63,185,80,.07); }
+    .card.card-down { border-color: rgba(248,81,73,.28);  box-shadow: 0 2px 14px rgba(248,81,73,.07); }
+
+    /* ── card header row (label + market badge) ──────────────────────── */
+    .card-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    /* ── market open/closed badge ────────────────────────────────────── */
+    .mkt-badge {
+      font-size: 0.66rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      padding: 2px 7px;
+      border-radius: 10px;
+      white-space: nowrap;
+    }
+    .mkt-badge.open   { color: var(--green); background: var(--green-bg); }
+    .mkt-badge.closed { color: var(--muted); background: rgba(139,148,158,.12); }
+
+    /* ── sentiment badge (header) ────────────────────────────────────── */
+    .sentiment-badge {
+      display: inline-flex;
+      align-items: center;
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
+      letter-spacing: .03em;
+      white-space: nowrap;
+    }
+    .sentiment-badge.bullish { color: var(--green); background: var(--green-bg); }
+    .sentiment-badge.bearish { color: var(--red);   background: var(--red-bg);   }
+    .sentiment-badge.neutral { color: var(--muted); background: rgba(139,148,158,.12); }
+
+    /* ── IST clock ───────────────────────────────────────────────────── */
+    #ist-clock { font-variant-numeric: tabular-nums; color: var(--text); }
+
+    /* ── market news & buzz section ─────────────────────────────────── */
+    .grid-buzz {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 1280px) { .grid-buzz { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 768px)  { .grid-buzz { grid-template-columns: 1fr; } }
+
+    .buzz-col {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .buzz-hdr {
+      padding: 11px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      background: var(--card2);
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .buzz-hdr-left { display: flex; align-items: center; gap: 8px; }
+    .buzz-badge {
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      padding: 3px 9px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+    .buzz-badge-news { background: rgba(88,166,255,.18);  color: var(--accent); }
+    .buzz-badge-pf   { background: rgba(63,185,80,.18);   color: var(--green); }
+    .buzz-count { font-size: 0.66rem; color: var(--muted); }
+    .buzz-ts    { font-size: 0.66rem; color: var(--muted); white-space: nowrap; }
+
+    .buzz-list { flex: 1; }
+
+    .buzz-item {
+      padding: 11px 16px;
+      border-bottom: 1px solid rgba(48,54,61,.55);
+      cursor: pointer;
+      transition: background .12s;
+    }
+    .buzz-item:last-child { border-bottom: none; }
+    .buzz-item:hover { background: rgba(255,255,255,.035); }
+
+    .buzz-headline {
+      font-size: 0.81rem;
+      font-weight: 600;
+      line-height: 1.45;
+      color: var(--text);
+      margin-bottom: 5px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .buzz-item:hover .buzz-headline { color: var(--accent); }
+
+    .buzz-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .buzz-src {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+    /* category badges */
+    .buzz-cat-economy { background: rgba(88,166,255,.14);  color: var(--accent); }
+    .buzz-cat-rbi     { background: rgba(227,179,65,.14);  color: var(--gold); }
+    .buzz-cat-budget  { background: rgba(63,185,80,.14);   color: var(--green); }
+    .buzz-cat-global  { background: rgba(139,148,158,.13); color: var(--muted); }
+    /* news source chip */
+    .buzz-src-news    { background: rgba(88,166,255,.1);   color: var(--accent); }
+    /* reddit sub chip */
+    .buzz-src-pf      { background: rgba(63,185,80,.12);   color: var(--green); }
+    /* indian blog chip */
+    .buzz-src-blog    { background: rgba(227,179,65,.12);  color: var(--gold); }
+    /* global news chip */
+    .buzz-src-global  { background: rgba(139,148,158,.13); color: var(--muted); }
+    /* score pill */
+    .buzz-score {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: var(--gold);
+      background: rgba(227,179,65,.12);
+      padding: 1px 6px;
+      border-radius: 3px;
+    }
+    /* category badge (finance news) */
+    .buzz-cat-badge {
+      font-size: 0.62rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 3px;
+      background: rgba(88,166,255,.13);
+      color: var(--accent);
+      white-space: nowrap;
+    }
+    .buzz-time { font-size: 0.66rem; color: var(--muted); }
+    .buzz-empty {
+      padding: 24px 16px;
+      color: var(--muted);
+      font-size: 0.79rem;
+      text-align: center;
+    }
+    .buzz-loading {
+      padding: 24px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    @media (max-width: 768px) {
+      .buzz-hdr { padding: 9px 12px; }
+      .buzz-item { padding: 10px 12px; }
+      .buzz-headline { font-size: 0.78rem; }
+    }
+
+    /* ── commodity source label ──────────────────────────────────────── */
+    .comm-source {
+      font-size: 0.67rem;
+      color: var(--muted);
+      margin-top: 5px;
+    }
+
+    /* ── footer note ─────────────────────────────────────────────────── */
+    .footer-note {
+      text-align: center;
+      font-size: 0.72rem;
+      color: var(--muted);
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════ HEADER ══════════════════════════════ -->
+<header>
+  <div class="logo">Finance <span>Tracker</span></div>
+  <div class="header-right">
+    <div class="meta-item">
+      <div class="dot" id="mkt-dot"></div>
+      <span id="mkt-txt">NSE</span>
+    </div>
+    <span id="sentiment-badge" class="sentiment-badge neutral">⚪ Neutral</span>
+    <div class="meta-item"><span id="ist-clock">—</span></div>
+    <div class="meta-item">Updated: <span id="last-updated">—</span></div>
+    <div class="meta-item"><span class="cd-label">Next refresh: </span><span id="countdown" style="font-variant-numeric:tabular-nums">5:00</span></div>
+    <button class="btn-refresh" id="btn-refresh" onclick="doRefresh()">⟳ Refresh</button>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════ MAIN ════════════════════════════════ -->
+<main>
+
+  <!-- Indices -->
+  <section class="section">
+    <div class="section-title">📊 Market Indices · NSE</div>
+    <div class="grid-3" id="grid-indices">
+      <div class="skeleton"><div class="spinner"></div> Loading market data…</div>
+    </div>
+  </section>
+
+  <!-- International Markets -->
+  <section class="section">
+    <div class="section-title">🌍 International Markets · Global</div>
+    <div class="grid-4" id="grid-intl">
+      <div class="skeleton"><div class="spinner"></div> Loading international data…</div>
+    </div>
+  </section>
+
+  <!-- Commodities -->
+  <section class="section">
+    <div class="section-title">🪙 Commodities · MCX</div>
+    <div class="grid-2" id="grid-commodities">
+      <div class="skeleton"><div class="spinner"></div> Loading commodity data…</div>
+    </div>
+  </section>
+
+  <!-- Market News & Buzz -->
+  <section class="section">
+    <div class="section-title">📰 Market News &amp; Buzz</div>
+    <div class="grid-buzz">
+
+      <!-- Finance & Economy News -->
+      <div class="buzz-col">
+        <div class="buzz-hdr">
+          <div class="buzz-hdr-left">
+            <span class="buzz-badge buzz-badge-news">📰 Finance &amp; Economy News</span>
+            <span class="buzz-count" id="buzz-count-news"></span>
+          </div>
+          <span class="buzz-ts" id="buzz-ts-news">—</span>
+        </div>
+        <div class="buzz-list" id="buzz-list-news">
+          <div class="buzz-loading"><div class="spinner" style="width:14px;height:14px;border-width:2px"></div></div>
+        </div>
+      </div>
+
+      <!-- Personal Finance & Insights -->
+      <div class="buzz-col">
+        <div class="buzz-hdr">
+          <div class="buzz-hdr-left">
+            <span class="buzz-badge buzz-badge-pf">💡 Personal Finance &amp; Insights</span>
+            <span class="buzz-count" id="buzz-count-pf"></span>
+          </div>
+          <span class="buzz-ts" id="buzz-ts-pf">—</span>
+        </div>
+        <div class="buzz-list" id="buzz-list-pf">
+          <div class="buzz-loading"><div class="spinner" style="width:14px;height:14px;border-width:2px"></div></div>
+        </div>
+      </div>
+
+      <!-- Global Finance -->
+      <div class="buzz-col">
+        <div class="buzz-hdr">
+          <div class="buzz-hdr-left">
+            <span class="buzz-badge" style="background:rgba(139,148,158,.13);color:var(--muted)">🌐 Global Finance</span>
+            <span class="buzz-count" id="buzz-count-global"></span>
+          </div>
+          <span class="buzz-ts" id="buzz-ts-global">—</span>
+        </div>
+        <div class="buzz-list" id="buzz-list-global">
+          <div class="buzz-loading"><div class="spinner" style="width:14px;height:14px;border-width:2px"></div></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <p class="footer-note">
+    NSE Indices &amp; Global Markets: Yahoo Finance · Gold &amp; Silver: ET Markets (live MCX) · News: last 48h · Auto-refreshes every 5 min · Powered by ET Markets, Yahoo Finance, Google News
+  </p>
+</main>
+
+<!-- ═══════════════════════════════ SCRIPT ══════════════════════════════ -->
+<script>
+/* ─── constants ─────────────────────────────────────────────────────── */
+const REFRESH_SEC = 300;
+
+const INDEX_ORDER = ["NIFTY 50", "NIFTY MIDCAP 150", "NIFTY SMLCAP 250"];
+const INDEX_NEWS  = {
+  "NIFTY 50":          "Nifty 50",
+  "NIFTY MIDCAP 150":  "Nifty Midcap 150",
+  "NIFTY SMLCAP 250":  "Nifty Smallcap 250",
+};
+
+const COMMODITY_ORDER = ["GOLD", "SILVER"];
+const COMMODITY_NEWS  = { GOLD: "MCX Gold", SILVER: "MCX Silver" };
+const PRIORITY_SRCS   = ["economic times", "economictimes", "live mint", "livemint", "moneycontrol", "business standard", "business-standard", "ndtv profit", "ndtvprofit"];
+
+const INDEX_SYMBOLS = {
+  "NIFTY 50":          "^NSEI",
+  "NIFTY MIDCAP 150":  "NIFTYMIDCAP150.NS",
+  "NIFTY SMLCAP 250":  "^CNX200",
+};
+const COMMODITY_SYMBOLS = { GOLD: "GC=F", SILVER: "SI=F" };
+const TF_LIST = ["1D", "1W", "1M", "6M", "1Y", "5Y"];
+
+const INTL_ORDER   = ["NASDAQ", "S&P 500", "KOSPI", "TAIEX"];
+const INTL_NEWS    = { "NASDAQ": "NASDAQ", "S&P 500": "S&P 500", "KOSPI": "KOSPI", "TAIEX": "TAIEX" };
+const INTL_SYMBOLS = { "NASDAQ": "^IXIC", "S&P 500": "^GSPC", "KOSPI": "^KS11", "TAIEX": "^TWII" };
+
+/* ─── Plotly config ──────────────────────────────────────────────────── */
+const PLOTLY_CFG = { responsive: true, displayModeBar: false };
+
+function plotLayout(yRange) {
+  return {
+    paper_bgcolor: "transparent",
+    plot_bgcolor:  "transparent",
+    margin: { l: 50, r: 8, t: 6, b: 32 },
+    height: 190,
+    xaxis: {
+      showgrid: false, zeroline: false, showline: false,
+      tickfont: { size: 10, color: "#8b949e" },
+      tickangle: -40, nticks: 8,
+    },
+    yaxis: {
+      showgrid: true, gridcolor: "#21262d",
+      zeroline: false, showline: false,
+      tickfont: { size: 10, color: "#8b949e" },
+      tickformat: ",.0f",
+      range: yRange,
+    },
+    showlegend: false,
+    hovermode: "x unified",
+  };
+}
+
+function plotTrace(times, prices, color) {
+  return {
+    x: times, y: prices,
+    type: "scatter", mode: "lines",
+    line: { color, width: 2, shape: "spline", smoothing: 0.8 },
+    fill: "tozeroy",
+    fillcolor: color + "1a",
+    hovertemplate: "₹%{y:,.2f}<extra></extra>",
+  };
+}
+
+/* ─── helpers ────────────────────────────────────────────────────────── */
+const fmt = n =>
+  n == null ? "--" : n.toLocaleString("en-IN", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+
+const fmtUS = n =>
+  n == null ? "--" : n.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+
+function badge(pct) {
+  if (pct == null) return '<span class="badge" style="color:var(--muted)">—</span>';
+  const up  = pct >= 0;
+  const cls = up ? "up" : "down";
+  const arr = up ? "▲" : "▼";
+  return `<span class="badge ${cls}">${arr} ${Math.abs(pct).toFixed(2)}%</span>`;
+}
+
+const color = pct => pct == null ? "#8b949e" : (pct >= 0 ? "#3fb950" : "#f85149");
+
+function safeId(s) { return s.replace(/\s+/g, "-"); }
+
+/* ─── timeframe bar ─────────────────────────────────────────────────── */
+function tfBar(chartId, symbol) {
+  return '<div class="tf-bar">' +
+    TF_LIST.map(tf =>
+      `<button class="tf-btn${tf === "1D" ? " active" : ""}" ` +
+      `onclick="changeTF('${chartId}','${symbol}','${tf}',this)">${tf}</button>`
+    ).join("") +
+    "</div>";
+}
+
+async function changeTF(chartId, symbol, period, btn) {
+  btn.closest(".tf-bar").querySelectorAll(".tf-btn")
+     .forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+
+  const el = document.getElementById(chartId);
+  if (el) {
+    Plotly.purge(chartId);
+    el.innerHTML = "";
+    el.innerHTML =
+      '<div class="no-chart"><div class="spinner" style="width:14px;height:14px;border-width:2px"></div></div>';
+  }
+
+  try {
+    const res  = await fetch(`/api/chart?symbol=${encodeURIComponent(symbol)}&period=${period}`);
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || "error");
+    const { times, prices, pChange } = json.data;
+    drawChart(chartId, times, prices, pChange);
+
+    // Show / hide the period % badge
+    const badgeEl = document.getElementById(chartId.replace("chart-", "tf-pct-"));
+    if (badgeEl) {
+      if (period === "1D") {
+        badgeEl.style.display = "none";
+      } else {
+        const up = pChange >= 0;
+        badgeEl.className = `badge ${up ? "up" : "down"}`;
+        badgeEl.innerHTML =
+          `${up ? "▲" : "▼"} ${Math.abs(pChange).toFixed(2)}%` +
+          ` <span style="opacity:.65;font-weight:500;font-size:.8em">(${period})</span>`;
+        badgeEl.style.display = "inline-flex";
+      }
+    }
+  } catch {
+    const el2 = document.getElementById(chartId);
+    if (el2) el2.innerHTML = '<div class="no-chart" style="color:var(--red)">Chart unavailable</div>';
+  }
+}
+
+/* ─── build index card HTML ──────────────────────────────────────────── */
+function indexCardHTML(sym, d) {
+  const sid    = safeId(sym);
+  const col    = color(d.pChange);
+  const sign   = (d.change != null && d.change >= 0) ? "+" : "";
+  const tintCls = d.pChange >= 0 ? "card-up" : "card-down";
+  return `
+  <div class="card ${tintCls}" id="card-${sid}">
+    <div class="card-top">
+      <div class="card-label">${sym}</div>
+      <div class="price-row">
+        <span class="price" style="color:${col}">₹${fmt(d.last)}</span>
+        ${badge(d.pChange)}
+        <span class="abs-change" style="color:${col}">${sign}${fmt(d.change)}</span>
+      </div>
+      <div id="tf-pct-${sid}" class="badge" style="display:none;margin-top:6px"></div>
+      <div class="stats">
+        <div class="stat"><span class="stat-l">Open</span>      <span class="stat-v">${fmt(d.open)}</span></div>
+        <div class="stat"><span class="stat-l">High</span>      <span class="stat-v" style="color:#3fb950">${fmt(d.high)}</span></div>
+        <div class="stat"><span class="stat-l">Low</span>       <span class="stat-v" style="color:#f85149">${fmt(d.low)}</span></div>
+        <div class="stat"><span class="stat-l">Prev Close</span><span class="stat-v">${fmt(d.prevClose)}</span></div>
+      </div>
+    </div>
+    ${tfBar(`chart-${sid}`, INDEX_SYMBOLS[sym])}
+    <div class="chart-box" id="chart-${sid}"></div>
+    <div class="news-box">
+      <div class="news-title">⚡ Why is it moving?</div>
+      <div class="news-summary" id="summary-${sid}"></div>
+      <ul class="news-list" id="news-${sid}">
+        <li style="color:var(--muted);font-size:.8rem">Fetching headlines…</li>
+      </ul>
+    </div>
+  </div>`;
+}
+
+/* ─── build commodity card HTML ──────────────────────────────────────── */
+function commCardHTML(key, d) {
+  const sid     = key.toLowerCase();
+  const col     = color(d.pChange);
+  const warn    = d.pChange < -1;
+  const isGold  = key === "GOLD";
+  const tagCls  = isGold ? "tag-gold" : "tag-silver";
+  const tagTxt  = isGold ? "Gold · MCX · per 10g" : "Silver · MCX · per kg";
+  const srcHtml = d.source ? `<div class="comm-source">Source: ${d.source}</div>` : "";
+  const tintCls = d.pChange >= 0 ? "card-up" : "card-down";
+  return `
+  <div class="card ${tintCls}" id="card-${sid}">
+    <div class="card-top">
+      <span class="tag ${tagCls}">${tagTxt}</span>
+      <div class="card-label">${d.name}</div>
+      <div class="price-row">
+        <span class="price" style="color:${col}">₹${fmt(d.current)}</span>
+        ${badge(d.pChange)}
+      </div>
+      ${srcHtml}
+      <div id="tf-pct-${sid}" class="badge" style="display:none;margin-top:6px"></div>
+    </div>
+    <div class="warn ${warn ? "" : "hidden"}" id="warn-${sid}">
+      ⚠ Price dropped more than 1% today (${d.pChange.toFixed(2)}%)
+    </div>
+    ${tfBar(`chart-${sid}`, COMMODITY_SYMBOLS[key])}
+    <div class="chart-box" id="chart-${sid}"></div>
+    <div class="news-box">
+      <div class="news-title">⚡ Why is it moving?</div>
+      <div class="news-summary" id="summary-${sid}"></div>
+      <ul class="news-list" id="news-${sid}">
+        <li style="color:var(--muted);font-size:.8rem">Fetching headlines…</li>
+      </ul>
+    </div>
+  </div>`;
+}
+
+/* ─── international market hours (IST) ──────────────────────────────── */
+function isIntlOpen(market) {
+  const now = new Date();
+  const ist = new Date(now.getTime() + (5.5 * 60 + now.getTimezoneOffset()) * 60000);
+  const day = ist.getDay();
+  const min = ist.getHours() * 60 + ist.getMinutes();
+  const wd  = day >= 1 && day <= 5;
+  if (market === "NASDAQ" || market === "S&P 500") {
+    // NYSE/NASDAQ: ~19:00–01:30 IST (EDT) / 20:00–02:30 IST (EST)
+    if (wd && min >= 19 * 60) return true;
+    if (day >= 2 && day <= 6 && min < 150) return true;
+    return false;
+  }
+  if (market === "KOSPI") return wd && min >= 330 && min <= 720;   // 5:30–12:00 IST
+  if (market === "TAIEX") return wd && min >= 390 && min <= 660;   // 6:30–11:00 IST
+  return false;
+}
+
+/* ─── build international card HTML ─────────────────────────────────── */
+function intlCardHTML(name, d) {
+  const sid     = safeId(name);
+  const col     = color(d.pChange);
+  const sign    = (d.change != null && d.change >= 0) ? "+" : "";
+  const tintCls = d.pChange >= 0 ? "card-up" : "card-down";
+  const open    = isIntlOpen(name);
+  const mktBadge = `<span class="mkt-badge ${open ? "open" : "closed"}">${open ? "🟢 Open" : "🔴 Closed"}</span>`;
+  return `
+  <div class="card ${tintCls}" id="card-intl-${sid}">
+    <div class="card-top">
+      <div class="card-header-row">
+        <div class="card-label">${name}</div>
+        ${mktBadge}
+      </div>
+      <div class="price-row">
+        <span class="price" style="color:${col}">${d.currSym}${fmtUS(d.last)}</span>
+        ${badge(d.pChange)}
+        <span class="abs-change" style="color:${col}">${sign}${fmtUS(d.change)}</span>
+      </div>
+      <div id="tf-pct-intl-${sid}" class="badge" style="display:none;margin-top:6px"></div>
+      <div class="stats">
+        <div class="stat"><span class="stat-l">Open</span>      <span class="stat-v">${fmtUS(d.open)}</span></div>
+        <div class="stat"><span class="stat-l">High</span>      <span class="stat-v" style="color:#3fb950">${fmtUS(d.high)}</span></div>
+        <div class="stat"><span class="stat-l">Low</span>       <span class="stat-v" style="color:#f85149">${fmtUS(d.low)}</span></div>
+        <div class="stat"><span class="stat-l">Prev Close</span><span class="stat-v">${fmtUS(d.prevClose)}</span></div>
+      </div>
+    </div>
+    ${tfBar(`chart-intl-${sid}`, INTL_SYMBOLS[name])}
+    <div class="chart-box" id="chart-intl-${sid}"></div>
+    <div class="news-box">
+      <div class="news-title">⚡ Why is it moving?</div>
+      <div class="news-summary" id="summary-intl-${sid}"></div>
+      <ul class="news-list" id="news-intl-${sid}">
+        <li style="color:var(--muted);font-size:.8rem">Fetching headlines…</li>
+      </ul>
+    </div>
+  </div>`;
+}
+
+/* ─── draw chart ─────────────────────────────────────────────────────── */
+function drawChart(elId, times, prices, pct) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  Plotly.purge(elId);
+  el.innerHTML = "";
+  if (!times || !times.length) {
+    el.innerHTML = '<div class="no-chart">No intraday data available</div>';
+    return;
+  }
+  const pad = 0.001;
+  const mn  = Math.min(...prices);
+  const mx  = Math.max(...prices);
+  const yRange = [mn - mn * pad, mx + mx * pad];
+  Plotly.newPlot(elId, [plotTrace(times, prices, color(pct))], plotLayout(yRange), PLOTLY_CFG);
+}
+
+/* ─── render news ─────────────────────────────────────────────────────── */
+function _ageLabel(pubStr) {
+  if (!pubStr) return "";
+  try {
+    const dt   = new Date(pubStr);
+    const diff = Date.now() - dt.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60)   return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs  < 24)   return `${hrs}h ago`;
+    return dt.toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  } catch { return ""; }
+}
+
+function _isPriority(src) {
+  const s = src.toLowerCase();
+  return PRIORITY_SRCS.some(p => s.includes(p));
+}
+
+function _cleanTitle(title) {
+  const idx = title.lastIndexOf(" - ");
+  return idx > 0 ? title.substring(0, idx) : title;
+}
+
+async function loadNews(listId, query, pchange) {
+  const el = document.getElementById(listId);
+  if (!el) return;
+  const sid       = listId.replace("news-", "");
+  const summaryEl = document.getElementById(`summary-${sid}`);
+  try {
+    const url  = `/api/news?q=${encodeURIComponent(query)}&pchange=${pchange ?? 0}`;
+    const res  = await fetch(url);
+    const json = await res.json();
+    const articles    = json.data?.articles    ?? [];
+    const summary     = json.data?.summary     ?? "";
+    const article_url = json.data?.article_url ?? "";
+
+    if (summaryEl && summary) {
+      let html = summary.replace(/\n/g, "<br>");
+      if (article_url) {
+        html += `<br><a href="${article_url}" target="_blank" rel="noopener noreferrer"
+          style="color:var(--accent);font-size:.75rem;font-weight:500;opacity:.8;display:inline-block;margin-top:4px">
+          Read full article →</a>`;
+      }
+      summaryEl.innerHTML = html;
+      summaryEl.style.display = "";
+    }
+
+    if (!json.ok || !articles.length) {
+      el.innerHTML = '<li style="color:var(--muted);font-size:.8rem">No recent news available.</li>';
+      return;
+    }
+    el.innerHTML = articles.map(n => {
+      const age  = _ageLabel(n.published);
+      const src  = n.source || "";
+      const prio = src && _isPriority(src);
+      const title = _cleanTitle(n.title || "");
+      const srcBadge = src
+        ? `<span class="news-src${prio ? " prio" : ""}">${src}</span>`
+        : "";
+      const agePart = age ? `<span class="news-pub">${age}</span>` : "";
+      return `<li class="news-item">
+        <a href="${n.link}" target="_blank" rel="noopener noreferrer">${title}</a>
+        <div class="news-meta">${srcBadge}${agePart}</div>
+      </li>`;
+    }).join("");
+  } catch {
+    el.innerHTML = '<li style="color:var(--muted);font-size:.8rem">Could not load news.</li>';
+  }
+}
+
+/* ─── load indices ───────────────────────────────────────────────────── */
+async function loadIndices() {
+  const grid = document.getElementById("grid-indices");
+  try {
+    const res  = await fetch("/api/indices");
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || "unknown error");
+
+    const data = json.data;
+    grid.innerHTML = INDEX_ORDER
+      .filter(s => data[s])
+      .map(s => indexCardHTML(s, data[s]))
+      .join("") || '<div class="err-block">No index data returned.</div>';
+
+    for (const sym of INDEX_ORDER) {
+      const d = data[sym];
+      if (!d) continue;
+      const sid   = safeId(sym);
+      const chart = d.chart || {};
+      drawChart(`chart-${sid}`, chart.times, chart.prices, d.pChange);
+      loadNews(`news-${sid}`, INDEX_NEWS[sym] || sym, d.pChange);
+    }
+  } catch (e) {
+    grid.innerHTML = `<div class="err-block">Failed to load indices: ${e.message}</div>`;
+  }
+}
+
+/* ─── load commodities ───────────────────────────────────────────────── */
+async function loadCommodities() {
+  const grid = document.getElementById("grid-commodities");
+  try {
+    const res  = await fetch("/api/commodities");
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || "unknown error");
+
+    const data = json.data;
+    grid.innerHTML = COMMODITY_ORDER
+      .filter(k => data[k])
+      .map(k => commCardHTML(k, data[k]))
+      .join("") || '<div class="err-block">No commodity data returned.</div>';
+
+    for (const key of COMMODITY_ORDER) {
+      const d = data[key];
+      if (!d) continue;
+      const sid = key.toLowerCase();
+      drawChart(`chart-${sid}`, d.times, d.prices, d.pChange);
+      loadNews(`news-${sid}`, COMMODITY_NEWS[key] || key, d.pChange);
+    }
+  } catch (e) {
+    grid.innerHTML = `<div class="err-block">Failed to load commodities: ${e.message}</div>`;
+  }
+}
+
+/* ─── load international markets ────────────────────────────────────── */
+async function loadIntl() {
+  const grid = document.getElementById("grid-intl");
+  try {
+    const res  = await fetch("/api/intl");
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || "unknown error");
+
+    const data = json.data;
+    grid.innerHTML = INTL_ORDER
+      .filter(n => data[n])
+      .map(n => intlCardHTML(n, data[n]))
+      .join("") || '<div class="err-block">No international data returned.</div>';
+
+    for (const name of INTL_ORDER) {
+      const d = data[name];
+      if (!d) continue;
+      const sid   = safeId(name);
+      const chart = d.chart || {};
+      drawChart(`chart-intl-${sid}`, chart.times, chart.prices, d.pChange);
+      loadNews(`news-intl-${sid}`, INTL_NEWS[name] || name, d.pChange);
+    }
+  } catch (e) {
+    grid.innerHTML = `<div class="err-block">Failed to load international data: ${e.message}</div>`;
+  }
+}
+
+/* ─── IST clock ──────────────────────────────────────────────────────── */
+function startClock() {
+  function tick() {
+    const now = new Date();
+    const ist = new Date(now.getTime() + (5.5 * 60 + now.getTimezoneOffset()) * 60000);
+    const hh  = String(ist.getHours()).padStart(2, "0");
+    const mm  = String(ist.getMinutes()).padStart(2, "0");
+    const ss  = String(ist.getSeconds()).padStart(2, "0");
+    const el  = document.getElementById("ist-clock");
+    if (el) el.textContent = `${hh}:${mm}:${ss} IST`;
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+
+/* ─── market sentiment ───────────────────────────────────────────────── */
+function updateSentiment() {
+  const up   = document.querySelectorAll(".card.card-up").length;
+  const down = document.querySelectorAll(".card.card-down").length;
+  const el   = document.getElementById("sentiment-badge");
+  if (!el) return;
+  if (up > down + 1) {
+    el.textContent = "🟢 Bullish";
+    el.className   = "sentiment-badge bullish";
+  } else if (down > up + 1) {
+    el.textContent = "🔴 Bearish";
+    el.className   = "sentiment-badge bearish";
+  } else {
+    el.textContent = "⚪ Neutral";
+    el.className   = "sentiment-badge neutral";
+  }
+}
+
+/* ─── market status ──────────────────────────────────────────────────── */
+function updateMarketStatus() {
+  const now = new Date();
+  const d   = now.getDay();           // 0=Sun, 6=Sat
+  const min = now.getHours() * 60 + now.getMinutes();
+  const open = d >= 1 && d <= 5 && min >= 9 * 60 + 15 && min <= 15 * 60 + 30;
+  document.getElementById("mkt-dot").className = "dot" + (open ? "" : " closed");
+  document.getElementById("mkt-txt").textContent = open ? "NSE Open" : "NSE Closed";
+}
+
+/* ─── countdown ──────────────────────────────────────────────────────── */
+let _secs = REFRESH_SEC;
+let _cdInterval = null;
+
+function startCountdown() {
+  _secs = REFRESH_SEC;
+  if (_cdInterval) clearInterval(_cdInterval);
+  _cdInterval = setInterval(() => {
+    _secs--;
+    const m = Math.floor(_secs / 60);
+    const s = _secs % 60;
+    const el = document.getElementById("countdown");
+    if (el) el.textContent = `${m}:${String(s).padStart(2, "0")}`;
+    if (_secs <= 0) doRefresh();
+  }, 1000);
+}
+
+/* ─── main refresh ───────────────────────────────────────────────────── */
+async function doRefresh() {
+  const btn = document.getElementById("btn-refresh");
+  if (btn) { btn.disabled = true; btn.textContent = "Loading…"; }
+
+  document.getElementById("last-updated").textContent =
+    new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  updateMarketStatus();
+  startCountdown();
+
+  await Promise.all([loadIndices(), loadIntl(), loadCommodities()]);
+  updateSentiment();
+
+  if (btn) { btn.disabled = false; btn.textContent = "⟳ Refresh"; }
+}
+
+/* ─── market news & buzz ─────────────────────────────────────────────── */
+const BUZZ_INTERVAL_MS = 900_000;   // 15 minutes
+let _buzzTimer = null;
+
+function esc(s) {
+  return String(s || "")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function _tsLabel(ts) {
+  if (!ts) return "";
+  const m = Math.floor((Date.now() / 1000 - ts) / 60);
+  return "Updated " + (m < 1 ? "just now" : m === 1 ? "1 min ago" : `${m} mins ago`);
+}
+
+function _buzzArticleHTML(a, srcCls) {
+  const age     = _ageLabel(a.published);
+  const catHtml = a.category ? `<span class="buzz-cat-badge">${esc(a.category)}</span>` : "";
+  const srcHtml = a.source   ? `<span class="buzz-src ${srcCls}">${esc(a.source)}</span>` : "";
+  const ageHtml = age        ? `<span class="buzz-time">${age}</span>` : "";
+  return `<div class="buzz-item" data-href="${esc(a.link)}">
+    <div class="buzz-headline">${esc(a.title)}</div>
+    <div class="buzz-meta">${catHtml}${srcHtml}${ageHtml}</div>
+  </div>`;
+}
+
+function renderBuzz(data) {
+  const ts  = data.ts || 0;
+  const lbl = _tsLabel(ts);
+  ["news", "pf", "global"].forEach(k => {
+    const el = document.getElementById(`buzz-ts-${k}`);
+    if (el) el.textContent = lbl;
+  });
+
+  // ── Finance & Economy News ──────────────────────────────────────────
+  const newsEl      = document.getElementById("buzz-list-news");
+  const newsCountEl = document.getElementById("buzz-count-news");
+  const newsItems   = data.finance_news || [];
+  if (newsCountEl) newsCountEl.textContent = newsItems.length ? `${newsItems.length} stories` : "";
+  if (newsEl) {
+    newsEl.innerHTML = newsItems.length
+      ? newsItems.map(a => _buzzArticleHTML(a, "buzz-src-news")).join("")
+      : '<div class="buzz-empty">No recent news found.</div>';
+  }
+
+  // ── Personal Finance & Insights ─────────────────────────────────────
+  const pfEl      = document.getElementById("buzz-list-pf");
+  const pfCountEl = document.getElementById("buzz-count-pf");
+  const pfItems   = data.pf_insights || [];
+  if (pfCountEl) pfCountEl.textContent = pfItems.length ? `${pfItems.length} posts` : "";
+  if (pfEl) {
+    pfEl.innerHTML = pfItems.length
+      ? pfItems.map(p => {
+          const srcCls = p.source_type === "reddit" ? "buzz-src-pf" : "buzz-src-blog";
+          return _buzzArticleHTML(p, srcCls);
+        }).join("")
+      : '<div class="buzz-empty">No recent posts found.</div>';
+  }
+
+  // ── Global Finance ─────────────────────────────────────────────────
+  const globalEl      = document.getElementById("buzz-list-global");
+  const globalCountEl = document.getElementById("buzz-count-global");
+  const globalItems   = data.global_news || [];
+  if (globalCountEl) globalCountEl.textContent = globalItems.length ? `${globalItems.length} stories` : "";
+  if (globalEl) {
+    globalEl.innerHTML = globalItems.length
+      ? globalItems.map(a => _buzzArticleHTML(a, "buzz-src-global")).join("")
+      : '<div class="buzz-empty">No recent global news found.</div>';
+  }
+}
+
+async function loadBuzz() {
+  try {
+    const res  = await fetch("/api/buzz");
+    const json = await res.json();
+    if (json.ok) renderBuzz(json.data);
+  } catch (e) {
+    console.warn("Buzz fetch failed:", e.message);
+  }
+}
+
+function startBuzzTimer() {
+  if (_buzzTimer) clearInterval(_buzzTimer);
+  _buzzTimer = setInterval(loadBuzz, BUZZ_INTERVAL_MS);
+}
+
+document.addEventListener("click", e => {
+  const item = e.target.closest(".buzz-item[data-href]");
+  if (item) window.open(item.dataset.href, "_blank", "noopener,noreferrer");
+});
+
+/* ─── boot ───────────────────────────────────────────────────────────── */
+startClock();
+doRefresh();
+loadBuzz();
+startBuzzTimer();
+</script>
+</body>
+</html>

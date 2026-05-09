@@ -1,0 +1,198 @@
+╔══════════════════════════════════════════════════════════════════╗
+║         Finance Tracker — Newsletter Setup Guide                ║
+╚══════════════════════════════════════════════════════════════════╝
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 1 — Install the only new library needed
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  pip install schedule
+
+All other libraries (smtplib, yfinance, feedparser, etc.) are already
+installed with the Finance Tracker dashboard.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 2 — Create a Gmail App Password
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+You CANNOT use your regular Gmail password.
+You need a special 16-character "App Password" that bypasses 2FA.
+
+── 2a. Enable 2-Step Verification (required first) ──────────────────
+
+  1. Go to: https://myaccount.google.com/security
+  2. Click "2-Step Verification"
+  3. Follow the prompts (phone number or Google Authenticator)
+  4. Complete and confirm it is enabled
+
+── 2b. Generate an App Password ─────────────────────────────────────
+
+  1. Go to: https://myaccount.google.com/apppasswords
+     (If you don't see this page, 2-Step Verification is not enabled yet)
+  2. In "Select app" dropdown → choose "Mail"
+  3. In "Select device" dropdown → choose "Windows Computer"
+  4. Click "Generate"
+  5. A 16-character password appears (e.g.  abcd efgh ijkl mnop)
+  6. COPY IT NOW — Google will never show it again
+
+  ⚠  Remove all spaces before using it: abcdefghijklmnop
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 3 — Set Environment Variables on Windows
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Replace the example values with your real email and app password.
+
+── Option A: Command Prompt (permanent — survives restarts) ─────────
+
+  setx GMAIL_ADDRESS      "your.email@gmail.com"
+  setx GMAIL_APP_PASSWORD "abcdefghijklmnop"
+  setx RECIPIENT_EMAIL    "where.to.send@gmail.com"
+
+  ⚠  Close and reopen your terminal after running setx.
+  ✅  Verify:  echo %GMAIL_ADDRESS%   (should print your email)
+
+── Option B: PowerShell (permanent — survives restarts) ─────────────
+
+  [System.Environment]::SetEnvironmentVariable("GMAIL_ADDRESS",      "your.email@gmail.com", "User")
+  [System.Environment]::SetEnvironmentVariable("GMAIL_APP_PASSWORD", "abcdefghijklmnop",     "User")
+  [System.Environment]::SetEnvironmentVariable("RECIPIENT_EMAIL",    "where.to.send@gmail.com", "User")
+
+  ⚠  Restart PowerShell after running these.
+  ✅  Verify:  $env:GMAIL_ADDRESS   (should print your email)
+
+── Option C: PowerShell — current session only (lost on close) ──────
+
+  $env:GMAIL_ADDRESS      = "your.email@gmail.com"
+  $env:GMAIL_APP_PASSWORD = "abcdefghijklmnop"
+  $env:RECIPIENT_EMAIL    = "where.to.send@gmail.com"
+
+  (Useful for quick testing; use Option A or B for permanent setup.)
+
+── Option D: Windows GUI ─────────────────────────────────────────────
+
+  1. Press Win + S → search "Edit the system environment variables"
+  2. Click "Environment Variables…" button
+  3. Under "User variables for <your name>", click "New" three times:
+
+     Variable name           Variable value
+     ─────────────────────   ──────────────────────────────
+     GMAIL_ADDRESS           your.email@gmail.com
+     GMAIL_APP_PASSWORD      abcdefghijklmnop  (no spaces)
+     RECIPIENT_EMAIL         where.to.send@gmail.com
+
+  4. Click OK on all dialogs
+  5. Restart your terminal
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 4 — Test the Setup (send one email now)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  cd C:\Users\Mayank\claude-test\finance-dashboard
+  python newsletter.py --test
+
+Expected output:
+
+  🧪  Test mode — sending one email now …
+
+  [08:32:01 IST] Fetching market data …
+  [08:32:15 IST] ✓ Data ready.
+  [08:32:16 IST] ✅  Email sent → your.email@gmail.com
+
+  • Check your inbox for:  "📊 Morning Market Brief | 08 May 2025 | Nifty ..."
+  • If not in inbox, check Spam / Junk folder
+  • The email may take 1–2 minutes to arrive
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 5 — Run the Daily Scheduler
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  cd C:\Users\Mayank\claude-test\finance-dashboard
+  python newsletter.py
+
+Expected output:
+
+  ╔══════════════════════════════════════════╗
+  ║  Finance Tracker — Daily Newsletter      ║
+  ║  Sends every weekday at 8:00 AM IST      ║
+  ╚══════════════════════════════════════════╝
+
+  Current IST : Thursday, 08 May 2025  08:30:22
+  ✅  Scheduler active. Waiting for 8:00 AM IST (Mon–Fri).
+      Press Ctrl+C to stop.
+
+Keep this terminal window open.
+The script polls every minute and sends automatically at exactly 8:00 AM IST
+every Monday–Friday. Weekends are skipped automatically.
+
+To stop it:  press Ctrl+C in the terminal.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WHAT THE EMAIL CONTAINS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Subject:  📊 Morning Market Brief | 08 May 2025 | Nifty 24,350.50 +0.42%
+
+Sections:
+  📊  NSE Market Indices
+      Nifty 50 / Midcap 150 / Smallcap 250
+      → Price + % change (green/red) + OHLC + 1-line news reason
+
+  🪙  Commodities · MCX
+      Gold (per 10g) + Silver (per kg) — live ET Markets prices
+
+  🌍  International Markets
+      NASDAQ / S&P 500 / KOSPI / TAIEX
+
+  📰  Finance & Economy News  (top 5 headlines)
+      Category badges: 🏦 RBI | 💰 Tax | 📊 ETF/MF | 🏛️ Policy
+      Prioritised: Economic Times > Mint > Business Standard
+
+  💡  Personal Finance & Insights  (top 3 posts)
+      From r/personalfinanceindia, r/IndiaInvestments, Freefincal,
+      Safal Niveshak, Capitalmind
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TROUBLESHOOTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌  "Authentication failed"
+    → You used your regular Gmail password instead of the App Password
+    → App Password is 16 characters, generated at myaccount.google.com/apppasswords
+    → Make sure to remove spaces (e.g. "abcd efgh" → "abcdefgh")
+
+❌  "Missing environment variables"
+    → Reopen your terminal after using setx
+    → Verify with:  echo %GMAIL_ADDRESS%  (cmd)  or  $env:GMAIL_ADDRESS  (PS)
+
+❌  "ModuleNotFoundError: No module named 'schedule'"
+    → Run:  pip install schedule
+
+❌  Email arrives but lands in Spam
+    → Open the email, click "Report not spam" in Gmail
+    → After a few days it will reliably land in inbox
+
+❌  Values show "—" in the email
+    → Market may be closed or Yahoo Finance data is temporarily unavailable
+    → This is normal outside NSE / NYSE trading hours
+
+❌  "Connection refused" or network errors
+    → Make sure the machine has internet access
+    → Try again; Yahoo Finance and ET Markets occasionally have brief outages
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+QUICK REFERENCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Test immediately:   python newsletter.py --test
+  Run daily:          python newsletter.py
+  Schedule:           8:00 AM IST, Monday–Friday only
+  Stop scheduler:     Ctrl+C
