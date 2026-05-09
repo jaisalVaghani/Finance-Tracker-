@@ -155,8 +155,8 @@
       .tf-bar { padding: 6px 10px 4px; gap: 5px; flex-wrap: wrap; }
       .tf-btn { padding: 5px 11px; font-size: 0.74rem; }
 
-      /* chart — fixed min-height prevents layout shift when news loads below */
-      .chart-box { padding: 0 2px 4px; width: 100%; overflow: hidden; min-height: 220px; flex-shrink: 0; }
+      /* chart — fixed height prevents collapse when mobile address-bar hides */
+      .chart-box { padding: 0 2px 4px; width: 100%; overflow: hidden; height: 220px; min-height: 220px; flex-shrink: 0; }
 
       /* news */
       .news-box { padding: 12px 14px 14px; }
@@ -202,7 +202,7 @@
       .badge { font-size: 0.8rem; padding: 2px 7px; }
 
       /* charts: remove side padding so they stretch fully */
-      .chart-box { padding: 0 0 4px; min-height: 220px; flex-shrink: 0; }
+      .chart-box { padding: 0 0 4px; height: 200px; min-height: 200px; flex-shrink: 0; }
       .tf-btn { padding: 5px 9px; font-size: 0.7rem; }
     }
 
@@ -274,7 +274,15 @@
     .warn.hidden { display: none; }
 
     /* ── chart area ──────────────────────────────────────────────────── */
-    .chart-box { padding: 0 6px 4px; flex-shrink: 0; width: 100%; overflow: hidden; }
+    .chart-box { padding: 0 6px 4px; flex-shrink: 0; width: 100%; overflow: hidden; height: 350px; }
+
+    /* prevents Plotly from collapsing on mobile address-bar hide/show */
+    .plotly-graph-div {
+      height: 100% !important;
+      min-height: 200px !important;
+      width: 100% !important;
+      position: relative;
+    }
 
     .no-chart {
       height: 60px;
@@ -746,6 +754,7 @@ function plotLayout(yRange) {
     plot_bgcolor:  "transparent",
     margin: isMobile ? { l: 42, r: 4, t: 4, b: 28 } : { l: 50, r: 8, t: 6, b: 32 },
     height: chartHeight,
+    autosize: false,
     xaxis: {
       showgrid: false, zeroline: false, showline: false,
       tickfont: { size: 10, color: "#8b949e" },
@@ -1308,6 +1317,21 @@ document.addEventListener("click", e => {
   const item = e.target.closest(".buzz-item[data-href]");
   if (item) window.open(item.dataset.href, "_blank", "noopener,noreferrer");
 });
+
+/* ─── debounced safe resize (guards against mobile address-bar collapse) */
+let resizeTimer;
+function safeResize() {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    document.querySelectorAll('.plotly-graph-div').forEach(el => {
+      if (el.offsetHeight > 50) {
+        Plotly.Plots.resize(el);
+      }
+    });
+  }, 250);
+}
+window.addEventListener('resize', safeResize);
+window.addEventListener('orientationchange', () => setTimeout(safeResize, 400));
 
 /* ─── boot ───────────────────────────────────────────────────────────── */
 startClock();
